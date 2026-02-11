@@ -1,17 +1,20 @@
 from __future__ import annotations
 
 import logging
-import os
+import pathlib
 import sqlite3
 import threading
 import time
 from contextlib import contextmanager
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 from weakref import WeakValueDictionary
 
 from filelock._api import AcquireReturnProxy
 
 from ._error import Timeout
+
+if TYPE_CHECKING:
+    import os
 
 _LOGGER = logging.getLogger("filelock")
 
@@ -70,7 +73,7 @@ class ReadWriteLock(metaclass=_ReadWriteLockMeta):
     @classmethod
     def get_lock(cls, lock_file: str | os.PathLike[str], timeout: float = -1, blocking: bool = True) -> ReadWriteLock:
         """Return the one-and-only ReadWriteLock for a given file."""
-        normalized = os.path.abspath(lock_file)
+        normalized = pathlib.Path(lock_file).resolve()
         with cls._instances_lock:
             if normalized not in cls._instances:
                 # Create the instance with a strong reference first
@@ -129,9 +132,7 @@ class ReadWriteLock(metaclass=_ReadWriteLockMeta):
                         f"Cannot acquire read lock on {self.lock_file} (lock id: {id(self)}): "
                         "already holding a write lock (downgrade not allowed)"
                     )
-                    raise RuntimeError(
-                        msg
-                    )
+                    raise RuntimeError(msg)
                 self._lock_level += 1
                 return AcquireReturnProxy(lock=self)
 
@@ -149,9 +150,7 @@ class ReadWriteLock(metaclass=_ReadWriteLockMeta):
                             f"Cannot acquire read lock on {self.lock_file} (lock id: {id(self)}): "
                             "already holding a write lock (downgrade not allowed)"
                         )
-                        raise RuntimeError(
-                            msg
-                        )
+                        raise RuntimeError(msg)
                     self._lock_level += 1
                     return AcquireReturnProxy(lock=self)
 
@@ -213,18 +212,14 @@ class ReadWriteLock(metaclass=_ReadWriteLockMeta):
                         f"Cannot acquire write lock on {self.lock_file} (lock id: {id(self)}): "
                         "already holding a read lock (upgrade not allowed)"
                     )
-                    raise RuntimeError(
-                        msg
-                    )
+                    raise RuntimeError(msg)
                 cur_thread_id = threading.get_ident()
                 if self._write_thread_id != cur_thread_id:
                     msg = (
                         f"Cannot acquire write lock on {self.lock_file} (lock id: {id(self)}) "
                         f"from thread {cur_thread_id} while it is held by thread {self._write_thread_id}"
                     )
-                    raise RuntimeError(
-                        msg
-                    )
+                    raise RuntimeError(msg)
                 self._lock_level += 1
                 return AcquireReturnProxy(lock=self)
 
@@ -242,9 +237,7 @@ class ReadWriteLock(metaclass=_ReadWriteLockMeta):
                             f"Cannot acquire write lock on {self.lock_file} (lock id: {id(self)}): "
                             "already holding a read lock (upgrade not allowed)"
                         )
-                        raise RuntimeError(
-                            msg
-                        )
+                        raise RuntimeError(msg)
                     self._lock_level += 1
                     return AcquireReturnProxy(lock=self)
 
