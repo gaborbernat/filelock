@@ -87,7 +87,7 @@ Choose the right lock for your use case:
 
         - ✓ Concurrent readers
         - ✓ Reentrant per mode
-        - ✗ No async, no lifetime
+        - ✓ Async via AsyncReadWriteLock
 
     .. grid-item-card::
         **AsyncFileLock**

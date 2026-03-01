@@ -303,6 +303,48 @@ When you're done with a ``ReadWriteLock``, close it to release the underlying SQ
     finally:
         rw.close()  # releases any held lock and closes the SQLite connection
 
+***********************************
+ Use async read / write locks
+***********************************
+
+For async code, use :class:`AsyncReadWriteLock <filelock.AsyncReadWriteLock>`. Because Python's :mod:`sqlite3` module
+has no async API, it wraps :class:`ReadWriteLock <filelock.ReadWriteLock>` and dispatches all blocking SQLite operations
+to a thread pool via ``loop.run_in_executor``:
+
+.. code-block:: python
+
+    from filelock import AsyncReadWriteLock
+
+    rw = AsyncReadWriteLock("data.db")
+
+    async with rw.read_lock():
+        data = await get_shared_data()
+
+    async with rw.write_lock():
+        await update_shared_data()
+
+You can pass a custom executor:
+
+.. code-block:: python
+
+    from concurrent.futures import ThreadPoolExecutor
+
+    executor = ThreadPoolExecutor(max_workers=2)
+    rw = AsyncReadWriteLock("data.db", executor=executor)
+
+Low-level ``acquire_read``/``acquire_write``/``release`` methods are also available:
+
+.. code-block:: python
+
+    await rw.acquire_read(timeout=5)
+    try:
+        data = await get_shared_data()
+    finally:
+        await rw.release()
+
+The same reentrancy and upgrade/downgrade rules as the synchronous :class:`ReadWriteLock <filelock.ReadWriteLock>`
+apply — see :ref:`how-to:Use shared read / exclusive write locks` for details.
+
 **************************************
  Detect stale locks (soft locks only)
 **************************************

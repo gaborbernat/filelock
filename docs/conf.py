@@ -88,7 +88,11 @@ def setup(app: Sphinx) -> None:
             node: pending_xref,
             contnode: Element,
         ) -> reference | None:
-            mapping = {"_thread._local": ("threading.local", "local")}
+            mapping = {
+                "_thread._local": ("threading.local", "local"),
+                "asyncio.events.AbstractEventLoop": ("asyncio.AbstractEventLoop", "AbstractEventLoop"),
+                "concurrent.futures._base.Executor": ("concurrent.futures.Executor", "Executor"),
+            }
             if target in mapping:
                 of_type, with_name = mapping[target]
                 target = of_type

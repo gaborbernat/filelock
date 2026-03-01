@@ -186,7 +186,9 @@ Lock selection flowchart:
 
     flowchart TD
         start["Choose a lock type"] --> question1{"Read-heavy workload?"}
-        question1 -->|Yes| rw["Use ReadWriteLock"]
+        question1 -->|Yes| questionAsync{"Async code?"}
+        questionAsync -->|Yes| arw["Use AsyncReadWriteLock"]
+        questionAsync -->|No| rw["Use ReadWriteLock"]
         question1 -->|No| question2{"Need network<br/>filesystem support?"}
         question2 -->|Yes| soft["Use SoftFileLock"]
         question2 -->|No| question3{"Need platform<br/>specific control?"}
@@ -198,7 +200,7 @@ Lock selection flowchart:
         classDef special fill:#dbeafe,stroke:#3b82f6,stroke-width:2px,color:#1e3a5f
         class default recommended
         class soft,platform alternative
-        class rw special
+        class rw,arw special
 
 Lock types compared
 ===================
@@ -241,7 +243,7 @@ Lock types compared
     - - Async support
       - AsyncFileLock
       - AsyncSoftFileLock
-      - No
+      - AsyncReadWriteLock
     - - Singleton default
       - No
       - No
@@ -360,6 +362,11 @@ management. SQLite handles: - Atomic transactions - Multiple concurrent readers 
 Persistence across process crashes
 
 This makes it the natural choice for read-write locks without adding network dependencies.
+
+The async variant (:class:`AsyncReadWriteLock <filelock.AsyncReadWriteLock>`) wraps the same SQLite-backed
+implementation. Because Python's :mod:`sqlite3` module has no async API, all blocking operations are dispatched to a
+thread pool via ``loop.run_in_executor``. This is the same approach used by :class:`BaseAsyncFileLock
+<filelock.BaseAsyncFileLock>`.
 
 ****************************
  File permissions and mode
