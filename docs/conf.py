@@ -53,6 +53,7 @@ ogp_description_length = 200
 
 html_theme = "furo"
 html_logo = "logo.svg"
+html_favicon = "logo.svg"
 html_title, html_last_updated_fmt = name, now.isoformat()
 html_baseurl = "https://py-filelock.readthedocs.io/"
 pygments_style, pygments_dark_style = "sphinx", "monokai"
