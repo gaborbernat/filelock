@@ -5,14 +5,17 @@ import itertools
 import os
 import subprocess  # ruff:ignore[suspicious-subprocess-import]  # only the fixed-argument, no-shell run below
 import sys
+from contextlib import contextmanager, suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, TypeVar
 
 import pytest
 from capabilities import CAPABILITIES
 
+from filelock import BaseFileLock, Timeout
+
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterator
+    from collections.abc import Callable, Generator, Iterator
 
     from pytest_mock import MockerFixture
 
@@ -21,6 +24,33 @@ if TYPE_CHECKING:
 os.environ["PYTHONPATH"] = os.pathsep.join(
     part for part in (str(Path(__file__).parent.parent / "tasks"), os.environ.get("PYTHONPATH")) if part
 )
+
+_LockT = TypeVar("_LockT", bound=BaseFileLock)
+
+
+def acquire_after_reclaim(lock: BaseFileLock) -> None:
+    """
+    Take a path whose stale marker the lock has to break first, without a wall-clock budget.
+
+    A try finds the marker and breaks it, or first watches an unreadable one age; the last creates its own. A deadline
+    would test how fast the machine is: a first try that outlasts it times out after the marker is gone and before the
+    lock is held.
+    """
+    for _ in range(3):
+        with suppress(Timeout):
+            lock.acquire(blocking=False)
+        if lock.is_locked:
+            return
+
+
+@contextmanager
+def held_after_reclaim(lock: _LockT) -> Generator[_LockT]:
+    """Hold *lock* through :func:`acquire_after_reclaim` and release it on exit."""
+    acquire_after_reclaim(lock)
+    try:
+        yield lock
+    finally:
+        lock.release()
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -179,3 +209,13 @@ def oplocked_lock_path(
     lock_path.write_text(getattr(request, "param", ""), encoding="utf-8")
     hold_oplock(lock_path)
     return lock_path
+
+
+@pytest.fixture
+def working_directories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    first = tmp_path / "first"
+    second = tmp_path / "second"
+    first.mkdir()
+    second.mkdir()
+    monkeypatch.chdir(first)
+    return first, second
