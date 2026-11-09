@@ -126,15 +126,25 @@ def test_read_write_lock_cycling_beside_a_holder_keeps_descriptors_flat(tmp_path
         assert descriptors_on(lock_path.stat()) == before
 
 
-@_NEEDS_FD_DIRECTORY
-def test_read_write_locks_held_together_each_keep_their_own_probe(tmp_path: Path) -> None:  # pragma: needs fd-directory
+@_NEEDS_PROBE_DESCRIPTORS  # pragma: win32 no cover
+def test_read_write_locks_held_together_each_keep_their_own_probe(tmp_path: Path) -> None:
     # macOS SQLite fails, now and then, to open two live connections through one /dev/fd name.
     lock_path: Final[Path] = tmp_path / "shared.db"
-    with (
-        ReadWriteLock(lock_path, is_singleton=False).read_lock(),
-        ReadWriteLock(lock_path, is_singleton=False).read_lock(),
-    ):
-        assert descriptors_on(lock_path.stat()) == 4
+    first: Final = ReadWriteLock(lock_path, is_singleton=False)
+    second: Final = ReadWriteLock(lock_path, is_singleton=False)
+    with first.read_lock(), second.read_lock():
+        first_connection = first._con
+        second_connection = second._con
+        assert first_connection is not None
+        assert second_connection is not None
+        first_probe = first_connection._probe
+        second_probe = second_connection._probe
+        assert first_probe is not None
+        assert second_probe is not None
+        assert first_probe.fd != second_probe.fd
+        node: Final = lock_path.stat()
+        assert os.path.samestat(os.fstat(first_probe.fd), node)
+        assert os.path.samestat(os.fstat(second_probe.fd), node)
 
 
 @_NEEDS_FD_DIRECTORY
